@@ -4,16 +4,12 @@ on:
   schedule:
     - cron: "0 5 * * 3"   # every Wednesday 05:00 UTC
   workflow_dispatch:       # lets you run it by hand from the Actions tab
-  push:
-    branches: [main]
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,16 +18,8 @@ jobs:
           python3 fetch.py data.json
           mkdir -p public
           python3 build.py public/index.html
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: public
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: npx --yes netlify-cli@latest deploy --dir=public --prod --site "$NETLIFY_SITE_ID"
