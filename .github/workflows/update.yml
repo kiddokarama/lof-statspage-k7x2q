@@ -22,4 +22,4 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: npx --yes netlify-cli@latest deploy --dir=public --prod --site "$NETLIFY_SITE_ID"
+        run: npx --yes netlify-cli@latest deploy --dir=public --functions netlify/functions --prod --site "$NETLIFY_SITE_ID"
