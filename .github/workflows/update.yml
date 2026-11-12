@@ -2,23 +2,51 @@ name: Update stats site
 
 on:
   schedule:
-    - cron: "0 5 * * 3"   # every Wednesday 05:00 UTC
-  workflow_dispatch:       # lets you run it by hand from the Actions tab
+    - cron: "17 */3 * * *"   # checks every 3 hours, deploys only when something changed
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Deploy even if nothing changed"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
 
 permissions:
-  contents: read
+  contents: write   # only used by the keep-alive step below
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Keep the schedule alive
+        run: |
+          # GitHub pauses scheduled workflows after 60 days without repo activity.
+          # If the last commit is over 40 days old, add an empty one (this does not trigger a deploy).
+          last=$(git log -1 --format=%ct); now=$(date +%s)
+          if [ $((now - last)) -gt $((40 * 86400)) ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Keep scheduled updates active"
+            git push
+          fi
       - name: Fetch FPL data and build the page
         run: |
           python3 fetch.py data.json
           mkdir -p public
           python3 build.py public/index.html
+      - name: Decide whether a deploy is needed
+        id: decide
+        env:
+          FORCE: ${{ github.event_name == 'push' || inputs.force == true }}
+        run: python3 should_deploy.py
       - name: Publish to Netlify
+        if: steps.decide.outputs.deploy == 'true'
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
